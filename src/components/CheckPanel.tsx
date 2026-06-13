@@ -1,0 +1,181 @@
+import { AlertTriangle, CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState } from 'react';
+import { useAppStore } from '../store';
+import { CheckResult } from '../types';
+import { cn } from '../utils/cn';
+
+export const CheckPanel = () => {
+  const checkResults = useAppStore((state) => state.getCheckResults());
+  const volumes = useAppStore((state) => state.volumes);
+  const setSelectedId = useAppStore((state) => state.setSelectedId);
+
+  const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
+
+  const toggleExpand = (index: number) => {
+    setExpandedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  };
+
+  const getTypeIcon = (type: CheckResult['type']) => {
+    switch (type) {
+      case 'gap':
+        return <XCircle className="w-5 h-5" />;
+      case 'pageConcentration':
+      case 'topicVariance':
+      case 'assigneeLoad':
+        return <AlertTriangle className="w-5 h-5" />;
+    }
+  };
+
+  const getTypeLabel = (type: CheckResult['type']) => {
+    switch (type) {
+      case 'gap':
+        return '编号断档';
+      case 'pageConcentration':
+        return '页数异常';
+      case 'topicVariance':
+        return '主题差异';
+      case 'assigneeLoad':
+        return '负载不均';
+    }
+  };
+
+  const handleDetailClick = (detail: string) => {
+    const match = detail.match(/第 (\d+) 册/);
+    if (match) {
+      const volumeNumber = parseInt(match[1]);
+      const volume = volumes.find((v) => v.volumeNumber === volumeNumber);
+      if (volume) {
+        setSelectedId(volume.id);
+      }
+    }
+  };
+
+  const errorCount = checkResults.filter((r) => r.severity === 'error').length;
+  const warningCount = checkResults.filter((r) => r.severity === 'warning').length;
+
+  if (checkResults.length === 0) {
+    return (
+      <div className="bg-white border-b border-gray-200 p-4">
+        <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg">
+          <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
+          <div>
+            <div className="font-medium text-green-800">检查通过</div>
+            <div className="text-sm text-green-600">
+              未发现编号断档、页数异常或负载不均等问题
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border-b border-gray-200 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold text-gray-900">自动检查结果</h3>
+        <div className="flex items-center gap-3 text-sm">
+          {errorCount > 0 && (
+            <span className="flex items-center gap-1 text-red-600">
+              <XCircle className="w-4 h-4" />
+              {errorCount} 个错误
+            </span>
+          )}
+          {warningCount > 0 && (
+            <span className="flex items-center gap-1 text-amber-600">
+              <AlertTriangle className="w-4 h-4" />
+              {warningCount} 个警告
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {checkResults.map((result, index) => {
+          const isExpanded = expandedItems.has(index);
+          return (
+            <div
+              key={index}
+              className={cn(
+                'rounded-lg border overflow-hidden',
+                result.severity === 'error'
+                  ? 'border-red-200 bg-red-50'
+                  : 'border-amber-200 bg-amber-50'
+              )}
+            >
+              <button
+                onClick={() => toggleExpand(index)}
+                className="w-full flex items-start gap-3 p-3 text-left"
+              >
+                <span
+                  className={cn(
+                    'mt-0.5 flex-shrink-0',
+                    result.severity === 'error' ? 'text-red-600' : 'text-amber-600'
+                  )}
+                >
+                  {getTypeIcon(result.type)}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        'px-2 py-0.5 rounded text-xs font-medium',
+                        result.severity === 'error'
+                          ? 'bg-red-200 text-red-800'
+                          : 'bg-amber-200 text-amber-800'
+                      )}
+                    >
+                      {getTypeLabel(result.type)}
+                    </span>
+                    <span
+                      className={cn(
+                        'text-sm font-medium',
+                        result.severity === 'error' ? 'text-red-800' : 'text-amber-800'
+                      )}
+                    >
+                      {result.message}
+                    </span>
+                  </div>
+                </div>
+                {result.details && result.details.length > 0 && (
+                  <span className="flex-shrink-0 text-gray-400">
+                    {isExpanded ? (
+                      <ChevronUp className="w-5 h-5" />
+                    ) : (
+                      <ChevronDown className="w-5 h-5" />
+                    )}
+                  </span>
+                )}
+              </button>
+              {isExpanded && result.details && result.details.length > 0 && (
+                <div
+                  className={cn(
+                    'px-12 pb-3 space-y-1',
+                    result.severity === 'error' ? 'text-red-700' : 'text-amber-700'
+                  )}
+                >
+                  {result.details.map((detail: string, detailIndex: number) => (
+                    <button
+                      key={detailIndex}
+                      onClick={() => handleDetailClick(detail)}
+                      className="block w-full text-left text-sm px-2 py-1 rounded hover:bg-white/50 transition-colors"
+                    >
+                      {detail}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
