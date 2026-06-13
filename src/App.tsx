@@ -64,21 +64,23 @@ function App() {
       )}
 
       {view === 'list' ? (
-        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-          <div className="w-full md:w-1/2 h-[40vh] md:h-full border-b md:border-b-0 md:border-r border-gray-200 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
+          <div className="w-full md:w-1/2 h-[40vh] md:h-full md:min-h-0 border-b md:border-b-0 md:border-r border-gray-200 flex flex-col overflow-hidden">
             <VolumeList onAddVolume={() => setIsAddModalOpen(true)} />
           </div>
 
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <CheckPanel />
-            <div className="flex-1 overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden md:min-h-0 h-[60vh] md:h-full">
+            <div className="flex-shrink-0 overflow-y-auto max-h-[40%] md:max-h-[45%]">
+              <CheckPanel />
+            </div>
+            <div className="flex-1 min-h-0 overflow-hidden">
               {selectedVolume ? (
                 <VolumeDetail
                   volume={selectedVolume}
                   onClose={() => setSelectedId(null)}
                 />
               ) : (
-                <div className="h-full flex flex-col items-center justify-center text-gray-400 bg-white">
+                <div className="h-full flex flex-col items-center justify-center text-gray-400 bg-white overflow-y-auto">
                   <p className="text-sm">选择左侧分册查看详情</p>
                 </div>
               )}

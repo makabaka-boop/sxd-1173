@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Save, Trash2, X, User, BookOpen, FileText, Package, AlertTriangle } from 'lucide-react';
 import { Volume, STATUS_LABELS, STATUS_COLORS, Status } from '../types';
 import { useAppStore } from '../store';
@@ -14,6 +14,7 @@ export const VolumeDetail = ({ volume, onClose }: VolumeDetailProps) => {
   const deleteVolume = useAppStore((state) => state.deleteVolume);
   const topics = useAppStore((state) => state.getTopics());
   const assignees = useAppStore((state) => state.getAssignees());
+  const allVolumes = useAppStore((state) => state.volumes);
 
   const [formData, setFormData] = useState({
     volumeNumber: volume.volumeNumber,
@@ -27,6 +28,22 @@ export const VolumeDetail = ({ volume, onClose }: VolumeDetailProps) => {
   });
 
   const [hasChanges, setHasChanges] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setFormData({
+      volumeNumber: volume.volumeNumber,
+      topic: volume.topic,
+      pageCount: volume.pageCount,
+      missingPages: volume.missingPages,
+      baggingStatus: volume.baggingStatus,
+      assignee: volume.assignee,
+      notes: volume.notes,
+      status: volume.status,
+    });
+    setHasChanges(false);
+    setErrors({});
+  }, [volume.id]);
 
   const handleChange = <K extends keyof typeof formData>(
     key: K,
@@ -37,11 +54,28 @@ export const VolumeDetail = ({ volume, onClose }: VolumeDetailProps) => {
   };
 
   const handleSave = () => {
+    const newErrors: Record<string, string> = {};
+    if (!formData.volumeNumber || formData.volumeNumber < 1) {
+      newErrors.volumeNumber = '请输入有效的分册编号';
+    }
+    if (formData.volumeNumber !== volume.volumeNumber) {
+      const duplicate = allVolumes.find(
+        (v) => v.id !== volume.id && v.volumeNumber === formData.volumeNumber
+      );
+      if (duplicate) {
+        newErrors.volumeNumber = `第 ${formData.volumeNumber} 册编号已存在`;
+      }
+    }
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
     updateVolume({
       ...volume,
       ...formData,
     });
     setHasChanges(false);
+    setErrors({});
   };
 
   const handleDelete = () => {
@@ -106,9 +140,20 @@ export const VolumeDetail = ({ volume, onClose }: VolumeDetailProps) => {
             <input
               type="number"
               value={formData.volumeNumber}
-              onChange={(e) => handleChange('volumeNumber', Number(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={(e) => {
+                handleChange('volumeNumber', Number(e.target.value));
+                if (errors.volumeNumber) {
+                  setErrors((prev) => ({ ...prev, volumeNumber: '' }));
+                }
+              }}
+              className={cn(
+                'w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
+                errors.volumeNumber ? 'border-red-300' : 'border-gray-200'
+              )}
             />
+            {errors.volumeNumber && (
+              <p className="text-xs text-red-500">{errors.volumeNumber}</p>
+            )}
           </div>
 
           <div className="space-y-2">

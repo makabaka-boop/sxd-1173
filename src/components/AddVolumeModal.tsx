@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Save, BookOpen } from 'lucide-react';
 import { useAppStore } from '../store';
 import { STATUS_LABELS, Status } from '../types';
@@ -15,22 +15,31 @@ export const AddVolumeModal = ({ isOpen, onClose }: AddVolumeModalProps) => {
   const topics = useAppStore((state) => state.getTopics());
   const assignees = useAppStore((state) => state.getAssignees());
 
-  const nextVolumeNumber = volumes.length > 0
-    ? Math.max(...volumes.map(v => v.volumeNumber)) + 1
-    : 1;
+  const getDefaultFormData = () => {
+    const nextVolumeNumber = volumes.length > 0
+      ? Math.max(...volumes.map(v => v.volumeNumber)) + 1
+      : 1;
+    return {
+      volumeNumber: nextVolumeNumber,
+      topic: topics[0] || '安全操作',
+      pageCount: 50,
+      missingPages: '',
+      baggingStatus: false,
+      assignee: assignees[0] || '未分配',
+      notes: '',
+      status: 'pending' as Status,
+    };
+  };
 
-  const [formData, setFormData] = useState({
-    volumeNumber: nextVolumeNumber,
-    topic: topics[0] || '安全操作',
-    pageCount: 50,
-    missingPages: '',
-    baggingStatus: false,
-    assignee: assignees[0] || '未分配',
-    notes: '',
-    status: 'pending' as Status,
-  });
-
+  const [formData, setFormData] = useState(getDefaultFormData());
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (isOpen) {
+      setFormData(getDefaultFormData());
+      setErrors({});
+    }
+  }, [isOpen, volumes.length, topics.length, assignees.length]);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -83,16 +92,7 @@ export const AddVolumeModal = ({ isOpen, onClose }: AddVolumeModalProps) => {
     });
 
     onClose();
-    setFormData({
-      volumeNumber: nextVolumeNumber + 1,
-      topic: topics[0] || '安全操作',
-      pageCount: 50,
-      missingPages: '',
-      baggingStatus: false,
-      assignee: assignees[0] || '未分配',
-      notes: '',
-      status: 'pending',
-    });
+    setFormData(getDefaultFormData());
     setErrors({});
   };
 

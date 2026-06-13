@@ -38,6 +38,14 @@ export const VolumeItem = ({ volume, onStatusChange }: VolumeItemProps) => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isEditable = 
+        target.tagName === 'INPUT' || 
+        target.tagName === 'TEXTAREA' || 
+        target.tagName === 'SELECT' ||
+        target.isContentEditable;
+      if (isEditable) return;
+
       if (isActive && !isBatchMode && !e.metaKey && !e.ctrlKey) {
         const newStatus = STATUS_KEYBOARD_MAP[e.key];
         if (newStatus && newStatus !== volume.status) {
