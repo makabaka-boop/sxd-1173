@@ -1,4 +1,4 @@
-import { BookOpen, AlertTriangle, Eye, FileText, Users, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { BookOpen, AlertTriangle, Eye, FileText, Users, AlertCircle, CheckCircle2, Clock, AlertOctagon } from 'lucide-react';
 import { useAppStore } from '../store';
 import { STATUS_LABELS } from '../types';
 import { cn } from '../utils/cn';
@@ -25,30 +25,39 @@ export const TaskSummary = () => {
 
   const exceptionCards = [
     {
+      key: 'pendingExceptionCount',
+      label: '异常待办',
+      count: summary.pendingExceptionCount + summary.processingExceptionCount,
+      icon: <AlertOctagon className="w-4 h-4" />,
+      color: 'text-red-600 bg-red-50',
+      iconColor: 'text-red-500',
+      filter: 'pending_exceptions' as const,
+    },
+    {
+      key: 'closedExceptionCount',
+      label: '已闭环异常',
+      count: summary.closedExceptionCount,
+      icon: <CheckCircle2 className="w-4 h-4" />,
+      color: 'text-emerald-600 bg-emerald-50',
+      iconColor: 'text-emerald-500',
+      filter: 'closed_exceptions' as const,
+    },
+    {
       key: 'todayNewExceptions',
       label: '今日新增异常',
       count: summary.todayNewExceptions,
       icon: <AlertCircle className="w-4 h-4" />,
-      color: 'text-red-600 bg-red-50',
-      iconColor: 'text-red-500',
+      color: 'text-amber-600 bg-amber-50',
+      iconColor: 'text-amber-500',
       filter: 'missing_unhandled' as const,
-    },
-    {
-      key: 'closedExceptions',
-      label: '已闭环异常',
-      count: summary.closedExceptions,
-      icon: <CheckCircle className="w-4 h-4" />,
-      color: 'text-green-600 bg-green-50',
-      iconColor: 'text-green-500',
-      filter: '' as const,
     },
     {
       key: 'staleVolumeCount',
       label: '超24h未更新',
       count: summary.staleVolumeCount,
       icon: <Clock className="w-4 h-4" />,
-      color: 'text-amber-600 bg-amber-50',
-      iconColor: 'text-amber-500',
+      color: 'text-orange-600 bg-orange-50',
+      iconColor: 'text-orange-500',
       filter: 'stale_unupdated' as const,
     },
   ];

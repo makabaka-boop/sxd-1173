@@ -1,11 +1,12 @@
 import { create } from 'zustand';
-import { Volume, Filters, Status, FlowRecord } from './types';
+import { Volume, Filters, Status, FlowRecord, ExceptionRecord, ExceptionType, ExceptionPriority } from './types';
 import { db } from './db';
 import { filterVolumes, runAllChecks, getTaskSummary, getUniqueTopics, getUniqueAssignees, generateChangeSummary, createFlowRecord } from './utils/checks';
 
 interface AppState {
   volumes: Volume[];
   flowRecords: FlowRecord[];
+  exceptions: ExceptionRecord[];
   selectedId: string | null;
   selectedIds: Set<string>;
   filters: Filters;
@@ -24,7 +25,7 @@ interface AppState {
   setView: (view: 'list' | 'checklist') => void;
   setBatchMode: (enabled: boolean) => void;
 
-  addVolume: (volume: Omit<Volume, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  addVolume: (volume: Omit<Volume, 'id' | 'createdAt' | 'updatedAt' | 'hasOpenException' | 'exceptionCount'>) => Promise<void>;
   updateVolume: (volume: Volume) => Promise<void>;
   updateVolumeStatus: (id: string, status: Status) => Promise<void>;
   deleteVolume: (id: string) => Promise<void>;
@@ -32,6 +33,12 @@ interface AppState {
 
   batchUpdateStatus: (ids: string[], status: Status) => Promise<void>;
   batchDelete: (ids: string[]) => Promise<void>;
+
+  addException: (volumeId: string, type: ExceptionType, description: string, source: string, priority: ExceptionPriority) => Promise<void>;
+  processException: (exceptionId: string, handler: string, handleNote: string) => Promise<void>;
+  closeException: (exceptionId: string, handler: string, handleNote: string) => Promise<void>;
+  reopenException: (exceptionId: string, handler: string, handleNote: string) => Promise<void>;
+  getExceptionsForVolume: (volumeId: string) => ExceptionRecord[];
 
   getFilteredVolumes: () => Volume[];
   getCheckResults: () => ReturnType<typeof runAllChecks>;
@@ -44,6 +51,7 @@ interface AppState {
 export const useAppStore = create<AppState>((set, get) => ({
   volumes: [],
   flowRecords: [],
+  exceptions: [],
   selectedId: null,
   selectedIds: new Set(),
   filters: {
@@ -63,7 +71,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const volumes = await db.getAll();
       const flowRecords = await db.getAllFlowRecords();
-      set({ volumes, flowRecords, loading: false });
+      const exceptions = await db.getAllExceptions();
+      set({ volumes, flowRecords, exceptions, loading: false });
     } catch (error) {
       console.error('Failed to load volumes:', error);
       set({ loading: false });
@@ -112,7 +121,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   setBatchMode: (enabled) => set({ isBatchMode: enabled, selectedIds: new Set(), selectedId: null }),
 
   addVolume: async (volume) => {
-    const newVolume = await db.add(volume);
+    const volumeWithDefaults = {
+      ...volume,
+      hasOpenException: false,
+      exceptionCount: 0,
+    };
+    const newVolume = await db.add(volumeWithDefaults);
     const changes = generateChangeSummary(null, { ...newVolume, ...volume });
     if (newVolume.missingPages && newVolume.missingPages.trim()) {
       changes.push({
@@ -169,9 +183,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   deleteVolume: async (id) => {
     await db.delete(id);
     await db.deleteFlowRecordsByVolumeId(id);
+    await db.deleteExceptionsByVolumeId(id);
     set((state) => ({
       volumes: state.volumes.filter((v) => v.id !== id),
       flowRecords: state.flowRecords.filter((r) => r.volumeId !== id),
+      exceptions: state.exceptions.filter((e) => e.volumeId !== id),
       selectedId: state.selectedId === id ? null : state.selectedId,
       selectedIds: new Set(Array.from(state.selectedIds).filter(sid => sid !== id)),
     }));
@@ -214,18 +230,165 @@ export const useAppStore = create<AppState>((set, get) => ({
     await db.bulkDelete(ids);
     for (const id of ids) {
       await db.deleteFlowRecordsByVolumeId(id);
+      await db.deleteExceptionsByVolumeId(id);
     }
     set((state) => ({
       volumes: state.volumes.filter(v => !ids.includes(v.id)),
       flowRecords: state.flowRecords.filter(r => !ids.includes(r.volumeId)),
+      exceptions: state.exceptions.filter(e => !ids.includes(e.volumeId)),
       selectedIds: new Set(),
       selectedId: null,
     }));
   },
 
+  addException: async (volumeId, type, description, source, priority) => {
+    const newException = await db.addException({
+      volumeId,
+      type,
+      status: 'pending',
+      priority,
+      source,
+      description,
+      handler: '',
+      handleNote: '',
+    });
+
+    const volume = get().volumes.find(v => v.id === volumeId);
+    if (volume) {
+      const updatedVolume = {
+        ...volume,
+        hasOpenException: true,
+        exceptionCount: volume.exceptionCount + 1,
+      };
+      await db.update(updatedVolume);
+      set((state) => ({
+        volumes: state.volumes.map(v => v.id === volumeId ? updatedVolume : v),
+      }));
+    }
+
+    const flowRecord = await db.addFlowRecord(createFlowRecord(
+      volumeId,
+      'exception_create',
+      `登记异常：${description}`
+    ));
+
+    set((state) => ({
+      exceptions: [newException, ...state.exceptions],
+      flowRecords: [flowRecord, ...state.flowRecords],
+    }));
+  },
+
+  processException: async (exceptionId, handler, handleNote) => {
+    const exception = get().exceptions.find(e => e.id === exceptionId);
+    if (!exception) return;
+
+    const updated: ExceptionRecord = {
+      ...exception,
+      status: 'processing',
+      handler,
+      handleNote,
+    };
+    const updatedException = await db.updateException(updated);
+
+    const flowRecord = await db.addFlowRecord(createFlowRecord(
+      exception.volumeId,
+      'exception_process',
+      `处置异常：${handleNote || '开始处置'}（处理人：${handler}）`
+    ));
+
+    set((state) => ({
+      exceptions: state.exceptions.map(e => e.id === exceptionId ? updatedException : e),
+      flowRecords: [flowRecord, ...state.flowRecords],
+    }));
+  },
+
+  closeException: async (exceptionId, handler, handleNote) => {
+    const exception = get().exceptions.find(e => e.id === exceptionId);
+    if (!exception) return;
+
+    const now = Date.now();
+    const updated: ExceptionRecord = {
+      ...exception,
+      status: 'closed',
+      handler,
+      handleNote,
+      closedAt: now,
+    };
+    const updatedException = await db.updateException(updated);
+
+    const volume = get().volumes.find(v => v.id === exception.volumeId);
+    if (volume) {
+      const remainingOpen = get().exceptions.filter(
+        e => e.volumeId === exception.volumeId && e.id !== exceptionId && e.status !== 'closed'
+      );
+      const updatedVolume = {
+        ...volume,
+        hasOpenException: remainingOpen.length > 0,
+      };
+      await db.update(updatedVolume);
+      set((state) => ({
+        volumes: state.volumes.map(v => v.id === exception.volumeId ? updatedVolume : v),
+      }));
+    }
+
+    const flowRecord = await db.addFlowRecord(createFlowRecord(
+      exception.volumeId,
+      'exception_close',
+      `闭环异常：${handleNote || '已闭环'}（处理人：${handler}）`
+    ));
+
+    set((state) => ({
+      exceptions: state.exceptions.map(e => e.id === exceptionId ? updatedException : e),
+      flowRecords: [flowRecord, ...state.flowRecords],
+    }));
+  },
+
+  reopenException: async (exceptionId, handler, handleNote) => {
+    const exception = get().exceptions.find(e => e.id === exceptionId);
+    if (!exception) return;
+
+    const updated: ExceptionRecord = {
+      ...exception,
+      status: 'reopened',
+      handler,
+      handleNote,
+      closedAt: undefined,
+    };
+    const updatedException = await db.updateException(updated);
+
+    const volume = get().volumes.find(v => v.id === exception.volumeId);
+    if (volume) {
+      const updatedVolume = {
+        ...volume,
+        hasOpenException: true,
+      };
+      await db.update(updatedVolume);
+      set((state) => ({
+        volumes: state.volumes.map(v => v.id === exception.volumeId ? updatedVolume : v),
+      }));
+    }
+
+    const flowRecord = await db.addFlowRecord(createFlowRecord(
+      exception.volumeId,
+      'exception_reopen',
+      `重新打开异常：${handleNote || '重新打开'}（处理人：${handler}）`
+    ));
+
+    set((state) => ({
+      exceptions: state.exceptions.map(e => e.id === exceptionId ? updatedException : e),
+      flowRecords: [flowRecord, ...state.flowRecords],
+    }));
+  },
+
+  getExceptionsForVolume: (volumeId) => {
+    return get().exceptions
+      .filter(e => e.volumeId === volumeId)
+      .sort((a, b) => b.createdAt - a.createdAt);
+  },
+
   getFilteredVolumes: () => filterVolumes(get().volumes, get().filters),
   getCheckResults: () => runAllChecks(get().volumes),
-  getTaskSummary: () => getTaskSummary(get().volumes, get().flowRecords),
+  getTaskSummary: () => getTaskSummary(get().volumes, get().flowRecords, get().exceptions),
   getTopics: () => getUniqueTopics(get().volumes),
   getAssignees: () => getUniqueAssignees(get().volumes),
   getFlowRecordsForVolume: (volumeId: string) => {

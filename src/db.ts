@@ -1,10 +1,11 @@
 import { openDB, IDBPDatabase } from 'idb';
-import { Volume, FlowRecord } from './types';
+import { Volume, FlowRecord, ExceptionRecord } from './types';
 
 const DB_NAME = 'training-manual-db';
 const VOLUME_STORE = 'volumes';
 const FLOW_STORE = 'flowRecords';
-const DB_VERSION = 2;
+const EXCEPTION_STORE = 'exceptions';
+const DB_VERSION = 3;
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
 
@@ -12,7 +13,7 @@ const initDB = async () => {
   if (dbPromise) return dbPromise;
 
   dbPromise = openDB(DB_NAME, DB_VERSION, {
-    upgrade(database) {
+    upgrade(database, oldVersion) {
       if (!database.objectStoreNames.contains(VOLUME_STORE)) {
         const store = database.createObjectStore(VOLUME_STORE, { keyPath: 'id' });
         store.createIndex('volumeNumber', 'volumeNumber', { unique: true });
@@ -26,6 +27,31 @@ const initDB = async () => {
         const flowStore = database.createObjectStore(FLOW_STORE, { keyPath: 'id' });
         flowStore.createIndex('volumeId', 'volumeId');
         flowStore.createIndex('timestamp', 'timestamp');
+      }
+
+      if (!database.objectStoreNames.contains(EXCEPTION_STORE)) {
+        const exceptionStore = database.createObjectStore(EXCEPTION_STORE, { keyPath: 'id' });
+        exceptionStore.createIndex('volumeId', 'volumeId');
+        exceptionStore.createIndex('status', 'status');
+        exceptionStore.createIndex('type', 'type');
+        exceptionStore.createIndex('createdAt', 'createdAt');
+      }
+
+      if (oldVersion < 3) {
+        const volumeStore = database.transaction(VOLUME_STORE, 'readwrite').store;
+        const request = volumeStore.openCursor();
+        request.then(function addExceptionFields(cursor) {
+          if (!cursor) return;
+          const volume = cursor.value;
+          if (volume.hasOpenException === undefined) {
+            volume.hasOpenException = false;
+          }
+          if (volume.exceptionCount === undefined) {
+            volume.exceptionCount = 0;
+          }
+          cursor.update(volume);
+          cursor.continue().then(addExceptionFields);
+        });
       }
     },
   });
@@ -121,6 +147,56 @@ export const db = {
   async deleteFlowRecordsByVolumeId(volumeId: string): Promise<void> {
     const database = await initDB();
     const tx = database.transaction(FLOW_STORE, 'readwrite');
+    const index = tx.store.index('volumeId');
+    let cursor = await index.openCursor(volumeId);
+    while (cursor) {
+      await cursor.delete();
+      cursor = await cursor.continue();
+    }
+    await tx.done;
+  },
+
+  async getExceptionsByVolumeId(volumeId: string): Promise<ExceptionRecord[]> {
+    const database = await initDB();
+    const index = database.transaction(EXCEPTION_STORE).store.index('volumeId');
+    const records = await index.getAll(volumeId);
+    return records.sort((a, b) => b.createdAt - a.createdAt);
+  },
+
+  async getAllExceptions(): Promise<ExceptionRecord[]> {
+    const database = await initDB();
+    const records = await database.getAllFromIndex(EXCEPTION_STORE, 'createdAt');
+    return records.reverse();
+  },
+
+  async addException(exception: Omit<ExceptionRecord, 'id' | 'createdAt' | 'updatedAt'>): Promise<ExceptionRecord> {
+    const database = await initDB();
+    const now = Date.now();
+    const newException: ExceptionRecord = {
+      ...exception,
+      id: crypto.randomUUID(),
+      createdAt: now,
+      updatedAt: now,
+    };
+    await database.add(EXCEPTION_STORE, newException);
+    return newException;
+  },
+
+  async updateException(exception: ExceptionRecord): Promise<ExceptionRecord> {
+    const database = await initDB();
+    const updated = { ...exception, updatedAt: Date.now() };
+    await database.put(EXCEPTION_STORE, updated);
+    return updated;
+  },
+
+  async deleteException(id: string): Promise<void> {
+    const database = await initDB();
+    await database.delete(EXCEPTION_STORE, id);
+  },
+
+  async deleteExceptionsByVolumeId(volumeId: string): Promise<void> {
+    const database = await initDB();
+    const tx = database.transaction(EXCEPTION_STORE, 'readwrite');
     const index = tx.store.index('volumeId');
     let cursor = await index.openCursor(volumeId);
     while (cursor) {

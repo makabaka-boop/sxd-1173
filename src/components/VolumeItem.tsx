@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, AlertTriangle, Package, Check } from 'lucide-react';
+import { GripVertical, AlertTriangle, Package, Check, AlertOctagon } from 'lucide-react';
 import { Volume, STATUS_LABELS, STATUS_COLORS, STATUS_KEYBOARD_MAP } from '../types';
 import { useAppStore } from '../store';
 import { cn } from '../utils/cn';
@@ -96,6 +96,9 @@ export const VolumeItem = ({ volume, onStatusChange }: VolumeItemProps) => {
         quickFilter === 'missing_unhandled' && matchesQuickFilter && 'border-l-[3px] border-l-amber-400',
         quickFilter === 'review_timeout' && matchesQuickFilter && 'border-l-[3px] border-l-red-400',
         quickFilter === 'recently_updated' && matchesQuickFilter && 'border-l-[3px] border-l-blue-400',
+        quickFilter === 'pending_exceptions' && matchesQuickFilter && 'border-l-[3px] border-l-red-500',
+        quickFilter === 'closed_exceptions' && matchesQuickFilter && 'border-l-[3px] border-l-emerald-400',
+        volume.hasOpenException && 'bg-red-50/30',
       )}
     >
       {isBatchMode && (
@@ -137,6 +140,9 @@ export const VolumeItem = ({ volume, onStatusChange }: VolumeItemProps) => {
           {volume.missingPages && (
             <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
           )}
+          {volume.hasOpenException && (
+            <AlertOctagon className="w-3.5 h-3.5 text-red-500" />
+          )}
           {volume.baggingStatus && (
             <Package className="w-3.5 h-3.5 text-green-500" />
           )}
@@ -148,6 +154,12 @@ export const VolumeItem = ({ volume, onStatusChange }: VolumeItemProps) => {
           )}
           {quickFilter === 'missing_unhandled' && matchesQuickFilter && (
             <span className="text-[10px] text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded font-medium">缺页未处理</span>
+          )}
+          {quickFilter === 'pending_exceptions' && matchesQuickFilter && (
+            <span className="text-[10px] text-red-600 bg-red-100 px-1.5 py-0.5 rounded font-medium">待处理异常</span>
+          )}
+          {quickFilter === 'closed_exceptions' && matchesQuickFilter && (
+            <span className="text-[10px] text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded font-medium">已闭环</span>
           )}
         </div>
         <div className="flex items-center gap-3 text-xs text-gray-500">

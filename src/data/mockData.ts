@@ -32,6 +32,8 @@ export const generateMockData = (count: number = 30): Omit<Volume, 'id' | 'creat
       notes: rand() > 0.7 ? '需要重点检查装订质量' : '',
       status: STATUSES[Math.floor(rand() * STATUSES.length)],
       sortOrder: i - 1,
+      hasOpenException: false,
+      exceptionCount: 0,
     });
   }
   

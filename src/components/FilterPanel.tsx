@@ -1,4 +1,4 @@
-import { Filter, RotateCcw, Plus, AlertTriangle, Clock, AlertCircle } from 'lucide-react';
+import { Filter, RotateCcw, Plus, AlertTriangle, Clock, AlertCircle, AlertOctagon, CheckCircle2 } from 'lucide-react';
 import { useAppStore } from '../store';
 import { STATUS_LABELS, Status, QuickFilter } from '../types';
 import { cn } from '../utils/cn';
@@ -9,6 +9,8 @@ interface FilterPanelProps {
 
 const QUICK_FILTERS: { key: QuickFilter; label: string; icon: React.ReactNode; color: string }[] = [
   { key: 'missing_unhandled', label: '有缺页未处理', icon: <AlertTriangle className="w-3.5 h-3.5" />, color: 'text-amber-600 bg-amber-50 border-amber-200 hover:bg-amber-100' },
+  { key: 'pending_exceptions', label: '待处理异常', icon: <AlertOctagon className="w-3.5 h-3.5" />, color: 'text-red-600 bg-red-50 border-red-200 hover:bg-red-100' },
+  { key: 'closed_exceptions', label: '已闭环异常', icon: <CheckCircle2 className="w-3.5 h-3.5" />, color: 'text-emerald-600 bg-emerald-50 border-emerald-200 hover:bg-emerald-100' },
   { key: 'recently_updated', label: '最近更新', icon: <Clock className="w-3.5 h-3.5" />, color: 'text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100' },
   { key: 'review_timeout', label: '待复核超时', icon: <AlertCircle className="w-3.5 h-3.5" />, color: 'text-red-600 bg-red-50 border-red-200 hover:bg-red-100' },
   { key: 'stale_unupdated', label: '超24h未更新', icon: <Clock className="w-3.5 h-3.5" />, color: 'text-orange-600 bg-orange-50 border-orange-200 hover:bg-orange-100' },

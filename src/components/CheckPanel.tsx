@@ -1,7 +1,7 @@
-import { AlertTriangle, CheckCircle, XCircle, ChevronDown, ChevronUp, History } from 'lucide-react';
+import { AlertTriangle, CheckCircle, XCircle, ChevronDown, ChevronUp, History, AlertOctagon } from 'lucide-react';
 import { useState } from 'react';
 import { useAppStore } from '../store';
-import { CheckResult, OPERATION_LABELS, OPERATION_COLORS } from '../types';
+import { CheckResult, OPERATION_LABELS, OPERATION_COLORS, ExceptionType, ExceptionPriority } from '../types';
 import { cn } from '../utils/cn';
 
 export const CheckPanel = () => {
@@ -9,6 +9,7 @@ export const CheckPanel = () => {
   const volumes = useAppStore((state) => state.volumes);
   const setSelectedId = useAppStore((state) => state.setSelectedId);
   const getFlowRecordsForVolume = useAppStore((state) => state.getFlowRecordsForVolume);
+  const addException = useAppStore((state) => state.addException);
 
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
 
@@ -22,6 +23,31 @@ export const CheckPanel = () => {
       }
       return next;
     });
+  };
+
+  const getExceptionType = (checkType: CheckResult['type']): ExceptionType | null => {
+    switch (checkType) {
+      case 'gap':
+        return 'number_gap';
+      case 'pageConcentration':
+      case 'topicVariance':
+        return 'page_abnormal';
+      default:
+        return null;
+    }
+  };
+
+  const getExceptionPriority = (severity: CheckResult['severity']): ExceptionPriority => {
+    return severity === 'error' ? 'high' : 'medium';
+  };
+
+  const handleCreateException = (volumeId: string, checkType: CheckResult['type'], description: string, severity: CheckResult['severity']) => {
+    const exceptionType = getExceptionType(checkType);
+    if (!exceptionType) return;
+    
+    const priority = getExceptionPriority(severity);
+    addException(volumeId, exceptionType, description, '自动检查', priority);
+    setSelectedId(volumeId);
   };
 
   const getTypeIcon = (type: CheckResult['type']) => {
@@ -188,16 +214,36 @@ export const CheckPanel = () => {
                     const lastRecord = volume
                       ? getFlowRecordsForVolume(volume.id)[0]
                       : getLatestRecord(assigneeVolumes.map((v) => v.id));
+                    const canCreateException = volume && getExceptionType(result.type);
 
                     return (
                       <div key={detailIndex}>
                         {volume ? (
-                          <button
-                            onClick={() => handleDetailClick(detail)}
-                            className="block w-full text-left text-sm px-2 py-1 rounded hover:bg-white/50 transition-colors"
-                          >
-                            {detail}
-                          </button>
+                          <div className="flex items-center justify-between gap-2">
+                            <button
+                              onClick={() => handleDetailClick(detail)}
+                              className="flex-1 text-left text-sm px-2 py-1 rounded hover:bg-white/50 transition-colors"
+                            >
+                              {detail}
+                            </button>
+                            {canCreateException && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCreateException(volume.id, result.type, detail, result.severity);
+                                }}
+                                className={cn(
+                                  'flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors',
+                                  result.severity === 'error'
+                                    ? 'bg-red-200 text-red-800 hover:bg-red-300'
+                                    : 'bg-amber-200 text-amber-800 hover:bg-amber-300'
+                                )}
+                              >
+                                <AlertOctagon className="w-3 h-3" />
+                                发起处置
+                              </button>
+                            )}
+                          </div>
                         ) : (
                           <div className="text-sm px-2 py-1">
                             {detail}

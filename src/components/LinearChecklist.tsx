@@ -1,4 +1,4 @@
-import { Printer, ArrowLeft, CheckCircle, Circle, Clock, Package, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Printer, ArrowLeft, CheckCircle, Circle, Clock, Package, AlertCircle, AlertTriangle, AlertOctagon } from 'lucide-react';
 import { useAppStore } from '../store';
 import { Volume, STATUS_LABELS, Status } from '../types';
 import { cn } from '../utils/cn';
@@ -9,6 +9,8 @@ const getPriority = (volume: Volume, now: number): number => {
   const hasMissing = !!(volume.missingPages && volume.missingPages.trim());
   const isStale = volume.updatedAt < twentyFourHoursAgo && volume.status !== 'done';
 
+  if (volume.hasOpenException && isStale) return -2;
+  if (volume.hasOpenException) return -1;
   if (hasMissing && isStale) return 0;
   if (volume.status === 'review' && volume.updatedAt < twentyFourHoursAgo) return 1;
   if (hasMissing && volume.status !== 'done') return 2;
@@ -117,6 +119,7 @@ export const LinearChecklist = () => {
             const hasMissing = !!(volume.missingPages && volume.missingPages.trim());
             const isStale = volume.updatedAt < twentyFourHoursAgo && volume.status !== 'done';
             const isReviewTimeout = volume.status === 'review' && volume.updatedAt < twentyFourHoursAgo;
+            const hasOpenException = volume.hasOpenException;
 
             return (
               <div
@@ -125,8 +128,10 @@ export const LinearChecklist = () => {
                 className={cn(
                   'group flex items-center gap-4 bg-white print:bg-transparent rounded-lg print:rounded-none p-4 print:p-2 border border-gray-200 print:border-0 print:border-b print:border-gray-300 cursor-pointer transition-all hover:shadow-md print:hover:shadow-none',
                   volume.status === 'done' && 'opacity-70',
-                  hasMissing && isStale && 'border-l-4 border-l-red-400 bg-red-50/50',
-                  isReviewTimeout && !hasMissing && 'border-l-4 border-l-amber-400 bg-amber-50/50',
+                  hasOpenException && isStale && 'border-l-4 border-l-red-500 bg-red-50/50',
+                  hasOpenException && !isStale && 'border-l-4 border-l-red-400 bg-red-50/30',
+                  hasMissing && isStale && !hasOpenException && 'border-l-4 border-l-red-400 bg-red-50/50',
+                  isReviewTimeout && !hasMissing && !hasOpenException && 'border-l-4 border-l-amber-400 bg-amber-50/50',
                 )}
               >
                 <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center">
@@ -144,15 +149,21 @@ export const LinearChecklist = () => {
                 </button>
 
                 <div className="print:hidden flex-shrink-0">
-                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <span className="font-mono font-bold text-gray-600">
+                  <div className={cn(
+                    'w-10 h-10 rounded-lg flex items-center justify-center',
+                    hasOpenException ? 'bg-red-100' : 'bg-gray-100'
+                  )}>
+                    <span className={cn(
+                      'font-mono font-bold',
+                      hasOpenException ? 'text-red-600' : 'text-gray-600'
+                    )}>
                       {volume.volumeNumber}
                     </span>
                   </div>
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
+                  <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                     <span className="print:font-mono font-semibold text-gray-900">
                       第{volume.volumeNumber}册
                     </span>
@@ -165,18 +176,24 @@ export const LinearChecklist = () => {
                     )}>
                       {STATUS_LABELS[volume.status]}
                     </span>
-                    {hasMissing && isStale && (
+                    {hasOpenException && (
+                      <span className="print:hidden text-[10px] text-red-600 bg-red-100 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
+                        <AlertOctagon className="w-3 h-3" /> 待处置异常
+                        {volume.exceptionCount > 1 && ` (${volume.exceptionCount})`}
+                      </span>
+                    )}
+                    {hasMissing && isStale && !hasOpenException && (
                       <span className="print:hidden text-[10px] text-red-600 bg-red-100 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
                         <AlertTriangle className="w-3 h-3" /> 异常停滞
                       </span>
                     )}
-                    {isReviewTimeout && !hasMissing && (
+                    {isReviewTimeout && !hasMissing && !hasOpenException && (
                       <span className="print:hidden text-[10px] text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
                         <Clock className="w-3 h-3" /> 复核超时
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 text-sm text-gray-500">
+                  <div className="flex items-center gap-3 text-sm text-gray-500 flex-wrap">
                     <span className="print:hidden">{volume.topic}</span>
                     <span className="print:hidden">{volume.pageCount}页</span>
                     <span className="print:hidden">{volume.assignee}</span>

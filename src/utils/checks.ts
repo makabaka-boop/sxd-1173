@@ -1,4 +1,4 @@
-import { Volume, CheckResult, TaskSummary, Filters, FlowRecord, OperationType, QuickFilter } from '../types';
+import { Volume, CheckResult, TaskSummary, Filters, FlowRecord, OperationType, QuickFilter, ExceptionRecord } from '../types';
 
 export const checkGaps = (volumes: Volume[]): CheckResult[] => {
   if (volumes.length < 2) return [];
@@ -131,7 +131,7 @@ export const runAllChecks = (volumes: Volume[]): CheckResult[] => {
   ];
 };
 
-export const getTaskSummary = (volumes: Volume[], flowRecords: FlowRecord[]): TaskSummary => {
+export const getTaskSummary = (volumes: Volume[], flowRecords: FlowRecord[], exceptions: ExceptionRecord[]): TaskSummary => {
   const now = Date.now();
   const today = new Date();
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
@@ -148,6 +148,9 @@ export const getTaskSummary = (volumes: Volume[], flowRecords: FlowRecord[]): Ta
     todayNewExceptions: 0,
     closedExceptions: 0,
     staleVolumeCount: 0,
+    pendingExceptionCount: 0,
+    closedExceptionCount: 0,
+    processingExceptionCount: 0,
   };
 
   volumes.forEach(v => {
@@ -186,6 +189,12 @@ export const getTaskSummary = (volumes: Volume[], flowRecords: FlowRecord[]): Ta
     if (v.status !== 'done' && v.updatedAt < twentyFourHoursAgo) {
       summary.staleVolumeCount++;
     }
+  });
+
+  exceptions.forEach(e => {
+    if (e.status === 'pending') summary.pendingExceptionCount++;
+    if (e.status === 'processing') summary.processingExceptionCount++;
+    if (e.status === 'closed') summary.closedExceptionCount++;
   });
 
   return summary;
@@ -283,6 +292,10 @@ export const isQuickFilterMatch = (volume: Volume, quickFilter: QuickFilter): bo
       const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
       return volume.status !== 'done' && volume.updatedAt < twentyFourHoursAgo;
     }
+    case 'pending_exceptions':
+      return volume.hasOpenException;
+    case 'closed_exceptions':
+      return volume.exceptionCount > 0 && !volume.hasOpenException;
     default:
       return true;
   }
