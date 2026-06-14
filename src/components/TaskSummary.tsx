@@ -1,4 +1,4 @@
-import { BookOpen, AlertTriangle, Eye, FileText, Users } from 'lucide-react';
+import { BookOpen, AlertTriangle, Eye, FileText, Users, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { useAppStore } from '../store';
 import { STATUS_LABELS } from '../types';
 import { cn } from '../utils/cn';
@@ -10,9 +10,10 @@ export const TaskSummary = () => {
   const view = useAppStore((state) => state.view);
   const isBatchMode = useAppStore((state) => state.isBatchMode);
   const setBatchMode = useAppStore((state) => state.setBatchMode);
-  
-  const progressPercent = summary.total > 0 
-    ? Math.round((summary.done / summary.total) * 100) 
+  const setFilters = useAppStore((state) => state.setFilters);
+
+  const progressPercent = summary.total > 0
+    ? Math.round((summary.done / summary.total) * 100)
     : 0;
 
   const statusCards = [
@@ -21,6 +22,36 @@ export const TaskSummary = () => {
     { key: 'review', label: STATUS_LABELS.review, count: summary.review, color: 'bg-status-review' },
     { key: 'done', label: STATUS_LABELS.done, count: summary.done, color: 'bg-status-done' },
   ] as const;
+
+  const exceptionCards = [
+    {
+      key: 'todayNewExceptions',
+      label: '今日新增异常',
+      count: summary.todayNewExceptions,
+      icon: <AlertCircle className="w-4 h-4" />,
+      color: 'text-red-600 bg-red-50',
+      iconColor: 'text-red-500',
+      filter: 'missing_unhandled' as const,
+    },
+    {
+      key: 'closedExceptions',
+      label: '已闭环异常',
+      count: summary.closedExceptions,
+      icon: <CheckCircle className="w-4 h-4" />,
+      color: 'text-green-600 bg-green-50',
+      iconColor: 'text-green-500',
+      filter: '' as const,
+    },
+    {
+      key: 'staleVolumeCount',
+      label: '超24h未更新',
+      count: summary.staleVolumeCount,
+      icon: <Clock className="w-4 h-4" />,
+      color: 'text-amber-600 bg-amber-50',
+      iconColor: 'text-amber-500',
+      filter: 'review_timeout' as const,
+    },
+  ];
 
   return (
     <div className="bg-white border-b border-gray-200 px-4 py-4 md:px-6">
@@ -44,7 +75,7 @@ export const TaskSummary = () => {
               </p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <button
               onClick={() => setView(view === 'list' ? 'checklist' : 'list')}
@@ -89,6 +120,30 @@ export const TaskSummary = () => {
                   <div className="text-xs text-gray-500">{item.label}</div>
                 </div>
               </div>
+            ))}
+
+            <div className="w-px bg-gray-200 mx-1 hidden md:block" />
+
+            {exceptionCards.map((item) => (
+              <button
+                key={item.key}
+                onClick={() => {
+                  if (item.filter) {
+                    setFilters({ quickFilter: item.filter });
+                  }
+                }}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-4 py-3 min-w-[140px] transition-colors',
+                  item.color,
+                  item.filter ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
+                )}
+              >
+                <div className={item.iconColor}>{item.icon}</div>
+                <div>
+                  <div className="text-2xl font-bold">{item.count}</div>
+                  <div className="text-xs opacity-80">{item.label}</div>
+                </div>
+              </button>
             ))}
           </div>
 

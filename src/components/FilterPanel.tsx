@@ -1,10 +1,17 @@
-import { Filter, RotateCcw, Plus } from 'lucide-react';
+import { Filter, RotateCcw, Plus, AlertTriangle, Clock, AlertCircle } from 'lucide-react';
 import { useAppStore } from '../store';
-import { STATUS_LABELS, Status } from '../types';
+import { STATUS_LABELS, Status, QuickFilter } from '../types';
+import { cn } from '../utils/cn';
 
 interface FilterPanelProps {
   onAddVolume: () => void;
 }
+
+const QUICK_FILTERS: { key: QuickFilter; label: string; icon: React.ReactNode; color: string }[] = [
+  { key: 'missing_unhandled', label: '有缺页未处理', icon: <AlertTriangle className="w-3.5 h-3.5" />, color: 'text-amber-600 bg-amber-50 border-amber-200 hover:bg-amber-100' },
+  { key: 'recently_updated', label: '最近更新', icon: <Clock className="w-3.5 h-3.5" />, color: 'text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100' },
+  { key: 'review_timeout', label: '待复核超时', icon: <AlertCircle className="w-3.5 h-3.5" />, color: 'text-red-600 bg-red-50 border-red-200 hover:bg-red-100' },
+];
 
 export const FilterPanel = ({ onAddVolume }: FilterPanelProps) => {
   const filters = useAppStore((state) => state.filters);
@@ -15,8 +22,8 @@ export const FilterPanel = ({ onAddVolume }: FilterPanelProps) => {
   const filteredCount = useAppStore((state) => state.getFilteredVolumes().length);
   const totalCount = useAppStore((state) => state.volumes.length);
 
-  const hasActiveFilters = filters.topic || filters.assignee || filters.status || 
-                          filters.pageMin !== '' || filters.pageMax !== '';
+  const hasActiveFilters = filters.topic || filters.assignee || filters.status ||
+                          filters.pageMin !== '' || filters.pageMax !== '' || filters.quickFilter;
 
   return (
     <div className="bg-white border-b border-gray-200 p-4 space-y-3">
@@ -44,6 +51,26 @@ export const FilterPanel = ({ onAddVolume }: FilterPanelProps) => {
             <Plus className="w-4 h-4" /> 新增
           </button>
         </div>
+      </div>
+
+      <div className="flex gap-2 flex-wrap">
+        {QUICK_FILTERS.map((qf) => (
+          <button
+            key={qf.key}
+            onClick={() => setFilters({
+              quickFilter: filters.quickFilter === qf.key ? '' : qf.key,
+            })}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+              filters.quickFilter === qf.key
+                ? qf.color
+                : 'text-gray-500 bg-gray-50 border-gray-200 hover:bg-gray-100'
+            )}
+          >
+            {qf.icon}
+            {qf.label}
+          </button>
+        ))}
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">

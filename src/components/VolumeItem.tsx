@@ -4,6 +4,7 @@ import { GripVertical, AlertTriangle, Package, Check } from 'lucide-react';
 import { Volume, STATUS_LABELS, STATUS_COLORS, STATUS_KEYBOARD_MAP } from '../types';
 import { useAppStore } from '../store';
 import { cn } from '../utils/cn';
+import { isQuickFilterMatch } from '../utils/checks';
 import { useEffect } from 'react';
 
 interface VolumeItemProps {
@@ -27,9 +28,12 @@ export const VolumeItem = ({ volume, onStatusChange }: VolumeItemProps) => {
   const setSelectedId = useAppStore((state) => state.setSelectedId);
   const isBatchMode = useAppStore((state) => state.isBatchMode);
   const updateVolumeStatus = useAppStore((state) => state.updateVolumeStatus);
+  const quickFilter = useAppStore((state) => state.filters.quickFilter);
 
   const isSelected = selectedIds.has(volume.id);
   const isActive = selectedId === volume.id && !isBatchMode;
+
+  const matchesQuickFilter = quickFilter ? isQuickFilterMatch(volume, quickFilter) : false;
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -39,9 +43,9 @@ export const VolumeItem = ({ volume, onStatusChange }: VolumeItemProps) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      const isEditable = 
-        target.tagName === 'INPUT' || 
-        target.tagName === 'TEXTAREA' || 
+      const isEditable =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
         target.tagName === 'SELECT' ||
         target.isContentEditable;
       if (isEditable) return;
@@ -87,7 +91,11 @@ export const VolumeItem = ({ volume, onStatusChange }: VolumeItemProps) => {
         isDragging && 'opacity-50 bg-blue-50',
         isActive && 'bg-blue-50',
         isSelected && 'bg-purple-50',
-        !isDragging && !isActive && !isSelected && 'hover:bg-gray-50'
+        !isDragging && !isActive && !isSelected && 'hover:bg-gray-50',
+        quickFilter && matchesQuickFilter && !isActive && !isSelected && 'bg-yellow-50/60',
+        quickFilter === 'missing_unhandled' && matchesQuickFilter && 'border-l-[3px] border-l-amber-400',
+        quickFilter === 'review_timeout' && matchesQuickFilter && 'border-l-[3px] border-l-red-400',
+        quickFilter === 'recently_updated' && matchesQuickFilter && 'border-l-[3px] border-l-blue-400',
       )}
     >
       {isBatchMode && (
@@ -131,6 +139,12 @@ export const VolumeItem = ({ volume, onStatusChange }: VolumeItemProps) => {
           )}
           {volume.baggingStatus && (
             <Package className="w-3.5 h-3.5 text-green-500" />
+          )}
+          {quickFilter === 'review_timeout' && matchesQuickFilter && (
+            <span className="text-[10px] text-red-600 bg-red-100 px-1.5 py-0.5 rounded font-medium">超时</span>
+          )}
+          {quickFilter === 'missing_unhandled' && matchesQuickFilter && (
+            <span className="text-[10px] text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded font-medium">缺页未处理</span>
           )}
         </div>
         <div className="flex items-center gap-3 text-xs text-gray-500">

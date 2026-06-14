@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Save, Trash2, X, User, BookOpen, FileText, Package, AlertTriangle } from 'lucide-react';
-import { Volume, STATUS_LABELS, STATUS_COLORS, Status } from '../types';
+import { Save, Trash2, X, User, BookOpen, FileText, Package, AlertTriangle, History } from 'lucide-react';
+import { Volume, STATUS_LABELS, STATUS_COLORS, Status, OPERATION_LABELS, OPERATION_COLORS } from '../types';
 import { useAppStore } from '../store';
 import { cn } from '../utils/cn';
 
@@ -15,6 +15,7 @@ export const VolumeDetail = ({ volume, onClose }: VolumeDetailProps) => {
   const topics = useAppStore((state) => state.getTopics());
   const assignees = useAppStore((state) => state.getAssignees());
   const allVolumes = useAppStore((state) => state.volumes);
+  const flowRecords = useAppStore((state) => state.getFlowRecordsForVolume(volume.id));
 
   const [formData, setFormData] = useState({
     volumeNumber: volume.volumeNumber,
@@ -29,6 +30,7 @@ export const VolumeDetail = ({ volume, onClose }: VolumeDetailProps) => {
 
   const [hasChanges, setHasChanges] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showFlowRecords, setShowFlowRecords] = useState(true);
 
   useEffect(() => {
     setFormData({
@@ -89,6 +91,21 @@ export const VolumeDetail = ({ volume, onClose }: VolumeDetailProps) => {
     handleChange('status', status);
   };
 
+  const formatTime = (timestamp: number) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return '刚刚';
+    if (diffMins < 60) return `${diffMins}分钟前`;
+    if (diffHours < 24) return `${diffHours}小时前`;
+    if (diffDays < 7) return `${diffDays}天前`;
+    return date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  };
+
   return (
     <div className="h-full flex flex-col bg-white">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
@@ -101,7 +118,7 @@ export const VolumeDetail = ({ volume, onClose }: VolumeDetailProps) => {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-blue-100 rounded-lg">
             <BookOpen className="w-6 h-6 text-blue-600" />
@@ -235,6 +252,46 @@ export const VolumeDetail = ({ volume, onClose }: VolumeDetailProps) => {
             rows={4}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           />
+        </div>
+
+        <div className="border-t border-gray-200 pt-4">
+          <button
+            onClick={() => setShowFlowRecords(!showFlowRecords)}
+            className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 mb-3"
+          >
+            <History className="w-4 h-4 text-gray-500" />
+            流转记录
+            <span className="text-xs text-gray-400">({flowRecords.length})</span>
+            <span className={cn('transition-transform text-gray-400', showFlowRecords && 'rotate-180')}>▾</span>
+          </button>
+
+          {showFlowRecords && (
+            <div className="space-y-2 max-h-64 overflow-y-auto scrollbar-thin">
+              {flowRecords.length === 0 ? (
+                <div className="text-sm text-gray-400 py-4 text-center">暂无流转记录</div>
+              ) : (
+                flowRecords.map((record) => (
+                  <div
+                    key={record.id}
+                    className="flex items-start gap-3 py-2 px-3 bg-gray-50 rounded-lg"
+                  >
+                    <div className="flex-shrink-0 mt-0.5">
+                      <span className={cn(
+                        'inline-block px-2 py-0.5 rounded text-[10px] font-medium',
+                        OPERATION_COLORS[record.operationType]
+                      )}>
+                        {OPERATION_LABELS[record.operationType]}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-gray-700">{record.summary}</div>
+                      <div className="text-xs text-gray-400 mt-0.5">{formatTime(record.timestamp)}</div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
       </div>
 

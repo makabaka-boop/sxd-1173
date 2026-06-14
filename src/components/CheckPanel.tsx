@@ -1,13 +1,14 @@
-import { AlertTriangle, CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertTriangle, CheckCircle, XCircle, ChevronDown, ChevronUp, History } from 'lucide-react';
 import { useState } from 'react';
 import { useAppStore } from '../store';
-import { CheckResult } from '../types';
+import { CheckResult, OPERATION_LABELS, OPERATION_COLORS } from '../types';
 import { cn } from '../utils/cn';
 
 export const CheckPanel = () => {
   const checkResults = useAppStore((state) => state.getCheckResults());
   const volumes = useAppStore((state) => state.volumes);
   const setSelectedId = useAppStore((state) => state.setSelectedId);
+  const getFlowRecordsForVolume = useAppStore((state) => state.getFlowRecordsForVolume);
 
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
 
@@ -161,15 +162,38 @@ export const CheckPanel = () => {
                     result.severity === 'error' ? 'text-red-700' : 'text-amber-700'
                   )}
                 >
-                  {result.details.map((detail: string, detailIndex: number) => (
-                    <button
-                      key={detailIndex}
-                      onClick={() => handleDetailClick(detail)}
-                      className="block w-full text-left text-sm px-2 py-1 rounded hover:bg-white/50 transition-colors"
-                    >
-                      {detail}
-                    </button>
-                  ))}
+                  {result.details.map((detail: string, detailIndex: number) => {
+                    const match = detail.match(/第 (\d+) 册/);
+                    const volume = match
+                      ? volumes.find((v) => v.volumeNumber === parseInt(match[1]))
+                      : null;
+                    const lastRecord = volume
+                      ? getFlowRecordsForVolume(volume.id)[0]
+                      : null;
+
+                    return (
+                      <div key={detailIndex}>
+                        <button
+                          onClick={() => handleDetailClick(detail)}
+                          className="block w-full text-left text-sm px-2 py-1 rounded hover:bg-white/50 transition-colors"
+                        >
+                          {detail}
+                        </button>
+                        {lastRecord && (
+                          <div className="flex items-center gap-2 ml-4 mt-0.5 text-xs text-gray-500">
+                            <History className="w-3 h-3" />
+                            <span className={cn(
+                              'px-1.5 py-0.5 rounded text-[10px] font-medium',
+                              OPERATION_COLORS[lastRecord.operationType]
+                            )}>
+                              {OPERATION_LABELS[lastRecord.operationType]}
+                            </span>
+                            <span>{lastRecord.summary}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
