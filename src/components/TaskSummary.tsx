@@ -49,7 +49,7 @@ export const TaskSummary = () => {
       icon: <Clock className="w-4 h-4" />,
       color: 'text-amber-600 bg-amber-50',
       iconColor: 'text-amber-500',
-      filter: 'review_timeout' as const,
+      filter: 'stale_unupdated' as const,
     },
   ];
 

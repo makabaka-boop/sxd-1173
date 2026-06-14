@@ -133,7 +133,8 @@ export const runAllChecks = (volumes: Volume[]): CheckResult[] => {
 
 export const getTaskSummary = (volumes: Volume[], flowRecords: FlowRecord[]): TaskSummary => {
   const now = Date.now();
-  const todayStart = new Date(new Date().toISOString().slice(0, 10)).getTime();
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
   const twentyFourHoursAgo = now - 24 * 60 * 60 * 1000;
 
   const summary: TaskSummary = {
@@ -158,16 +159,28 @@ export const getTaskSummary = (volumes: Volume[], flowRecords: FlowRecord[]): Ta
   });
 
   const todayNewRecords = flowRecords.filter(r =>
-    r.operationType === 'missing_pages_change' && r.timestamp >= todayStart
+    r.operationType === 'missing_pages_change' &&
+    r.timestamp >= todayStart &&
+    r.summary !== '缺页说明已清除'
   );
   const todayNewVolumeIds = new Set(todayNewRecords.map(r => r.volumeId));
+  volumes.forEach(v => {
+    if (v.createdAt >= todayStart && v.missingPages && v.missingPages.trim()) {
+      todayNewVolumeIds.add(v.id);
+    }
+  });
   summary.todayNewExceptions = todayNewVolumeIds.size;
 
-  const volumesWithMissingDone = volumes.filter(v => {
-    if (!v.missingPages || !v.missingPages.trim()) return false;
-    return v.status === 'done';
-  });
-  summary.closedExceptions = volumesWithMissingDone.length;
+  const exceptionVolumeIds = new Set(
+    flowRecords
+      .filter(r => r.operationType === 'missing_pages_change')
+      .map(r => r.volumeId)
+  );
+  summary.closedExceptions = volumes.filter(v =>
+    v.status === 'done' &&
+    !(v.missingPages && v.missingPages.trim()) &&
+    exceptionVolumeIds.has(v.id)
+  ).length;
 
   volumes.forEach(v => {
     if (v.status !== 'done' && v.updatedAt < twentyFourHoursAgo) {
@@ -265,6 +278,10 @@ export const isQuickFilterMatch = (volume: Volume, quickFilter: QuickFilter): bo
     case 'review_timeout': {
       const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
       return volume.status === 'review' && volume.updatedAt < twentyFourHoursAgo;
+    }
+    case 'stale_unupdated': {
+      const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
+      return volume.status !== 'done' && volume.updatedAt < twentyFourHoursAgo;
     }
     default:
       return true;

@@ -10,7 +10,7 @@ export interface FlowRecord {
   timestamp: number;
 }
 
-export type QuickFilter = 'missing_unhandled' | 'recently_updated' | 'review_timeout' | '';
+export type QuickFilter = 'missing_unhandled' | 'recently_updated' | 'review_timeout' | 'stale_unupdated' | '';
 
 export interface Volume {
   id: string;

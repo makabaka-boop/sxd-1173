@@ -59,6 +59,23 @@ export const CheckPanel = () => {
     }
   };
 
+  const getVolumeFromDetail = (detail: string) => {
+    const match = detail.match(/第 (\d+) 册/);
+    if (!match) return null;
+    return volumes.find((v) => v.volumeNumber === parseInt(match[1])) || null;
+  };
+
+  const getAssigneeFromDetail = (detail: string) => {
+    const match = detail.match(/^(.+?)\s*\(/);
+    return match?.[1] || null;
+  };
+
+  const getLatestRecord = (volumeIds: string[]) => {
+    return volumeIds
+      .flatMap((id) => getFlowRecordsForVolume(id))
+      .sort((a, b) => b.timestamp - a.timestamp)[0];
+  };
+
   const errorCount = checkResults.filter((r) => r.severity === 'error').length;
   const warningCount = checkResults.filter((r) => r.severity === 'warning').length;
 
@@ -163,22 +180,48 @@ export const CheckPanel = () => {
                   )}
                 >
                   {result.details.map((detail: string, detailIndex: number) => {
-                    const match = detail.match(/第 (\d+) 册/);
-                    const volume = match
-                      ? volumes.find((v) => v.volumeNumber === parseInt(match[1]))
-                      : null;
+                    const volume = getVolumeFromDetail(detail);
+                    const assignee = result.type === 'assigneeLoad' ? getAssigneeFromDetail(detail) : null;
+                    const assigneeVolumes = assignee
+                      ? volumes.filter((v) => v.assignee === assignee && v.status !== 'done')
+                      : [];
                     const lastRecord = volume
                       ? getFlowRecordsForVolume(volume.id)[0]
-                      : null;
+                      : getLatestRecord(assigneeVolumes.map((v) => v.id));
 
                     return (
                       <div key={detailIndex}>
-                        <button
-                          onClick={() => handleDetailClick(detail)}
-                          className="block w-full text-left text-sm px-2 py-1 rounded hover:bg-white/50 transition-colors"
-                        >
-                          {detail}
-                        </button>
+                        {volume ? (
+                          <button
+                            onClick={() => handleDetailClick(detail)}
+                            className="block w-full text-left text-sm px-2 py-1 rounded hover:bg-white/50 transition-colors"
+                          >
+                            {detail}
+                          </button>
+                        ) : (
+                          <div className="text-sm px-2 py-1">
+                            {detail}
+                            {result.type === 'gap' && (
+                              <span className="ml-2 text-xs text-gray-500">暂无对应分册</span>
+                            )}
+                          </div>
+                        )}
+                        {assigneeVolumes.length > 0 && (
+                          <div className="ml-4 mt-1 flex flex-wrap gap-1">
+                            {assigneeVolumes.slice(0, 5).map((item) => (
+                              <button
+                                key={item.id}
+                                onClick={() => setSelectedId(item.id)}
+                                className="px-1.5 py-0.5 rounded bg-white/60 hover:bg-white text-xs"
+                              >
+                                第{item.volumeNumber}册
+                              </button>
+                            ))}
+                            {assigneeVolumes.length > 5 && (
+                              <span className="px-1.5 py-0.5 text-xs text-gray-500">等{assigneeVolumes.length}册</span>
+                            )}
+                          </div>
+                        )}
                         {lastRecord && (
                           <div className="flex items-center gap-2 ml-4 mt-0.5 text-xs text-gray-500">
                             <History className="w-3 h-3" />

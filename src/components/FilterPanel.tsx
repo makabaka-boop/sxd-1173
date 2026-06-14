@@ -11,6 +11,7 @@ const QUICK_FILTERS: { key: QuickFilter; label: string; icon: React.ReactNode; c
   { key: 'missing_unhandled', label: '有缺页未处理', icon: <AlertTriangle className="w-3.5 h-3.5" />, color: 'text-amber-600 bg-amber-50 border-amber-200 hover:bg-amber-100' },
   { key: 'recently_updated', label: '最近更新', icon: <Clock className="w-3.5 h-3.5" />, color: 'text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100' },
   { key: 'review_timeout', label: '待复核超时', icon: <AlertCircle className="w-3.5 h-3.5" />, color: 'text-red-600 bg-red-50 border-red-200 hover:bg-red-100' },
+  { key: 'stale_unupdated', label: '超24h未更新', icon: <Clock className="w-3.5 h-3.5" />, color: 'text-orange-600 bg-orange-50 border-orange-200 hover:bg-orange-100' },
 ];
 
 export const FilterPanel = ({ onAddVolume }: FilterPanelProps) => {

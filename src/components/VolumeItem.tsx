@@ -143,6 +143,9 @@ export const VolumeItem = ({ volume, onStatusChange }: VolumeItemProps) => {
           {quickFilter === 'review_timeout' && matchesQuickFilter && (
             <span className="text-[10px] text-red-600 bg-red-100 px-1.5 py-0.5 rounded font-medium">超时</span>
           )}
+          {quickFilter === 'stale_unupdated' && matchesQuickFilter && (
+            <span className="text-[10px] text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded font-medium">超24h未更新</span>
+          )}
           {quickFilter === 'missing_unhandled' && matchesQuickFilter && (
             <span className="text-[10px] text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded font-medium">缺页未处理</span>
           )}

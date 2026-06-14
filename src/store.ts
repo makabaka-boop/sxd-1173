@@ -114,6 +114,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   addVolume: async (volume) => {
     const newVolume = await db.add(volume);
     const changes = generateChangeSummary(null, { ...newVolume, ...volume });
+    if (newVolume.missingPages && newVolume.missingPages.trim()) {
+      changes.push({
+        operationType: 'missing_pages_change',
+        summary: `缺页说明更新为「${newVolume.missingPages}」`,
+      });
+    }
     const newRecords: FlowRecord[] = [];
     for (const change of changes) {
       const record = await db.addFlowRecord(createFlowRecord(newVolume.id, change.operationType, change.summary));
